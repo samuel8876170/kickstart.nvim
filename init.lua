@@ -218,6 +218,8 @@ vim.api.nvim_create_autocmd('TextYankPost', {
 vim.filetype.add {
   extension = {
     k = 'k',
+    q = 'q',
+    s = 's',
   },
 }
 
