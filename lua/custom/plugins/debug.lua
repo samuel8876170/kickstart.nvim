@@ -24,6 +24,7 @@ return {
             '--offset-encoding=utf-8',
             '--pch-storage=memory',
             '--cross-file-rename',
+            '-std=c++26',
             '-j=4',
           }, -- command line for invoking clangd - this array will be extended with --compile-commands-dir and --query-driver after each cmake configure with parameters inferred from build_kit, build_type and build_dir
         },
