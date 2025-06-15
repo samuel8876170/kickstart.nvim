@@ -38,8 +38,20 @@ require("lazy").setup({
         },
       }
       -- Keymaps for Telescope
-      vim.keymap.set('n', '<leader>sf', require('telescope.builtin').find_files, {})
-      vim.keymap.set('n', '<leader>sg', require('telescope.builtin').live_grep, {})
+      local keymapper = require('nvim-keymapper')
+      keymapper.set('n', '<leader>sf', require('telescope.builtin').find_files, {}, 'Find files')
+      keymapper.set('n', '<leader>sg', require('telescope.builtin').live_grep, {}, 'Live grep')
+    end,
+  },
+  -- nvim-keymapper: fuzzy search for keymaps
+  {
+    "bgrohman/nvim-keymapper",
+    dependencies = { "nvim-telescope/telescope.nvim" },
+    config = function()
+      require("telescope").load_extension("nvim-keymapper")
+      local keymapper = require('nvim-keymapper')
+      vim.api.nvim_create_user_command('Keymaps', keymapper.keymaps_picker, {desc = 'Telescope: Show keymaps'})
+      keymapper.set('n', '<leader>sk', ':Keymaps<CR>', {}, 'Search keymaps')
     end,
   },
   -- vim-slime: send text to tmux terminal
@@ -110,11 +122,12 @@ require("lazy").setup({
       --   },
       -- }
       -- Keymaps for DAP
-      vim.keymap.set('n', '<leader>dcon', dap.continue)
-      vim.keymap.set('n', '<leader>dov', dap.step_over)
-      vim.keymap.set('n', '<leader>din', dap.step_into)
-      vim.keymap.set('n', '<leader>dou', dap.step_out)
-      vim.keymap.set('n', '<leader>db', dap.toggle_breakpoint)
+      local keymapper = require('nvim-keymapper')
+      keymapper.set('n', '<leader>dcon', dap.continue, {}, 'Continue debugging')
+      keymapper.set('n', '<leader>dov', dap.step_over, {}, 'Step over')
+      keymapper.set('n', '<leader>din', dap.step_into, {}, 'Step into')
+      keymapper.set('n', '<leader>dou', dap.step_out, {}, 'Step out')
+      keymapper.set('n', '<leader>db', dap.toggle_breakpoint, {}, 'Toggle breakpoint')
     end,
   },
   -- ALE: linting
@@ -147,11 +160,12 @@ require("lazy").setup({
 
 -- Additional configurations
 -- Open a new tmux pane with <leader>t
-vim.keymap.set('n', '<leader>tsw', ':!tmux split-window -h<CR>', { silent = true })
-vim.keymap.set('n', '<C-d>', '<C-d>zz', {noremap = false, silent = true})
-vim.keymap.set('n', '<C-u>', '<C-u>zz', {noremap = false, silent = true})
-vim.keymap.set('n', 'n', 'nzzzv', {noremap = false, silent = true})
-vim.keymap.set('n', 'N', 'Nzzzv', {noremap = false, silent = true})
+local keymapper = require('nvim-keymapper')
+keymapper.set('n', '<leader>tsw', ':!tmux split-window -h<CR>', { silent = true }, 'Open tmux terminal')
+keymapper.set('n', '<C-d>', '<C-d>zz', {noremap = false, silent = true}, 'Page down to center')
+keymapper.set('n', '<C-u>', '<C-u>zz', {noremap = false, silent = true}, 'Page up to center')
+keymapper.set('n', 'n', 'nzzzv', {noremap = false, silent = true}, 'Next search to center')
+keymapper.set('n', 'N', 'Nzzzv', {noremap = false, silent = true}, 'Previous search to center')
 
 -- You can add more settings here, such as:
 vim.opt.number = true
