@@ -3,9 +3,12 @@
 -- Prerequisites:
 -- - ripgrep for Telescope live_grep
 -- - tmux for vim-slime
--- - LSP servers: clangd for C/C++, pyright for Python
--- - Debug adapters: codelldb for C/C++, debugpy for Python
--- - Linters: clang for C/C++, flake8 for Python
+-- - clangd for C/C++ LSP
+-- - pyright-langserver for Python LSP
+-- - debugpy for Python debugging
+-- - codelldb for C/C++ debugging (optional)
+-- - clang for C/C++ linting
+-- - flake8 for Python linting
 -- Make sure these are installed and accessible in your PATH
 
 -- Bootstrap lazy.nvim
@@ -27,7 +30,7 @@ vim.g.maplocalleader = "\\"
 
 -- Setup lazy.nvim with plugins
 require("lazy").setup({
-  -- Telescope: fuzzy file finder
+  -- Telescope: fuzzy file finder and keymap search
   {
     "nvim-telescope/telescope.nvim",
     dependencies = { "nvim-lua/plenary.nvim" },
@@ -36,22 +39,16 @@ require("lazy").setup({
         defaults = {
           -- Default configuration for Telescope
         },
+	pickers = {
+          find_files = {
+            theme = "dropdown",
+          }
+        },
       }
       -- Keymaps for Telescope
-      local keymapper = require('nvim-keymapper')
-      keymapper.set('n', '<leader>sf', require('telescope.builtin').find_files, {}, 'Find files')
-      keymapper.set('n', '<leader>sg', require('telescope.builtin').live_grep, {}, 'Live grep')
-    end,
-  },
-  -- nvim-keymapper: fuzzy search for keymaps
-  {
-    "bgrohman/nvim-keymapper",
-    dependencies = { "nvim-telescope/telescope.nvim" },
-    config = function()
-      require("telescope").load_extension("nvim-keymapper")
-      local keymapper = require('nvim-keymapper')
-      vim.api.nvim_create_user_command('Keymaps', keymapper.keymaps_picker, {desc = 'Telescope: Show keymaps'})
-      keymapper.set('n', '<leader>sk', ':Keymaps<CR>', {}, 'Search keymaps')
+      vim.keymap.set('n', '<leader>sf', require('telescope.builtin').find_files, { desc = 'Find files' })
+      vim.keymap.set('n', '<leader>sg', require('telescope.builtin').live_grep, { desc = 'Live grep' })
+      vim.keymap.set('n', '<leader>sk', require('telescope.builtin').keymaps, { desc = 'Search keymaps' })
     end,
   },
   -- vim-slime: send text to tmux terminal
@@ -66,20 +63,10 @@ require("lazy").setup({
       ]])
     end,
   },
-  -- LSP: language server protocol
-  {
-    "neovim/nvim-lspconfig",
-    config = function()
-      local lspconfig = require('lspconfig')
-      -- Setup clangd for C/C++
-      lspconfig.clangd.setup{}
-      -- Setup pyright for Python
-      lspconfig.pyright.setup{}
-    end,
-  },
-  -- DAP: debugging
+  -- nvim-dap: debugging
   {
     "mfussenegger/nvim-dap",
+    tag = "0.8.0",
     config = function()
       local dap = require('dap')
       -- Example configuration for Python
@@ -122,12 +109,11 @@ require("lazy").setup({
       --   },
       -- }
       -- Keymaps for DAP
-      local keymapper = require('nvim-keymapper')
-      keymapper.set('n', '<leader>dcon', dap.continue, {}, 'Continue debugging')
-      keymapper.set('n', '<leader>dov', dap.step_over, {}, 'Step over')
-      keymapper.set('n', '<leader>din', dap.step_into, {}, 'Step into')
-      keymapper.set('n', '<leader>dou', dap.step_out, {}, 'Step out')
-      keymapper.set('n', '<leader>db', dap.toggle_breakpoint, {}, 'Toggle breakpoint')
+      vim.keymap.set('n', '<leader>dcon', dap.continue, { desc = 'Continue debugging' })
+      vim.keymap.set('n', '<leader>dov', dap.step_over, { desc = 'Step over' })
+      vim.keymap.set('n', '<leader>din', dap.step_into, { desc = 'Step into' })
+      vim.keymap.set('n', '<leader>dou', dap.step_out, { desc = 'Step out' })
+      vim.keymap.set('n', '<leader>db', dap.toggle_breakpoint, { desc = 'Toggle breakpoint' })
     end,
   },
   -- ALE: linting
@@ -148,24 +134,85 @@ require("lazy").setup({
   -- Treesitter: syntax highlighting
   {
     "nvim-treesitter/nvim-treesitter",
+    tag = "v0.9.1", 
     build = ":TSUpdate",
     config = function()
       require'nvim-treesitter.configs'.setup {
-        ensure_installed = { "c", "cpp", "python" },
+        ensure_installed = { "c", "cpp", "python", "lua", "vim", "vimdoc", "query" },
         highlight = { enable = true },
       }
     end,
   },
 })
 
+-- Manual LSP setup for C/C++ and Python
+local function get_root_dir(filetype, patterns)
+  return function(fname)
+    return vim.fs.find(patterns, { upward = true, path = vim.fs.dirname(fname) })[1]
+  end
+end
+
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = { "c", "cpp" },
+  callback = function()
+    local root_dir = get_root_dir("c", { "compile_commands.json", "CMakeLists.txt", ".git" })
+    vim.lsp.start({
+      name = "clangd",
+      cmd = { "clangd" },
+      root_dir = root_dir(vim.api.nvim_buf_get_name(0)),
+    })
+  end,
+})
+
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = "python",
+  callback = function()
+    local root_dir = get_root_dir("python", { "pyproject.toml", "setup.py", ".git" })
+    vim.lsp.start({
+      name = "pyright",
+      cmd = { "pyright-langserver", "--stdio" },
+      root_dir = root_dir(vim.api.nvim_buf_get_name(0)),
+    })
+  end,
+})
+
+-- LSP keymaps on attach
+vim.api.nvim_create_autocmd("LspAttach", {
+  callback = function(args)
+    local bufnr = args.buf
+    vim.keymap.set('n', 'gd', vim.lsp.buf.definition, { buffer = bufnr, desc = 'Go to definition' })
+    vim.keymap.set('n', 'K', vim.lsp.buf.hover, { buffer = bufnr, desc = 'Hover documentation' })
+    vim.keymap.set('n', '<leader>rn', vim.lsp.buf.rename, { buffer = bufnr, desc = 'Rename symbol' })
+    vim.keymap.set('n', '<leader>ca', vim.lsp.buf.code_action, { buffer = bufnr, desc = 'Code actions' })
+  end,
+})
+
+-- Highlight yanked text for 150 milliseconds using the "IncSearch" highlight group
+vim.api.nvim_create_autocmd("TextYankPost", {
+  callback = function()
+    vim.hl.on_yank({ higroup = "IncSearch", timeout = 150 })
+  end,
+})
+
+-- Telescope preview
+vim.api.nvim_create_autocmd("User", {
+  pattern = "TelescopePreviewerLoaded",
+  callback = function(args)
+    if args.data.filetype ~= "help" then
+      vim.wo.number = true
+    elseif args.data.bufname:match("*.csv") then
+      vim.wo.wrap = false
+    end
+  end,
+})
+
 -- Additional configurations
 -- Open a new tmux pane with <leader>t
-local keymapper = require('nvim-keymapper')
-keymapper.set('n', '<leader>tsw', ':!tmux split-window -h<CR>', { silent = true }, 'Open tmux terminal')
-keymapper.set('n', '<C-d>', '<C-d>zz', {noremap = false, silent = true}, 'Page down to center')
-keymapper.set('n', '<C-u>', '<C-u>zz', {noremap = false, silent = true}, 'Page up to center')
-keymapper.set('n', 'n', 'nzzzv', {noremap = false, silent = true}, 'Next search to center')
-keymapper.set('n', 'N', 'Nzzzv', {noremap = false, silent = true}, 'Previous search to center')
+vim.keymap.set('n', '<leader>tsw', ':!tmux split-window -h<CR>', { silent = true, desc = 'Open tmux terminal'})
+vim.keymap.set('n', '<C-d>', '<C-d>zz', {noremap = false, silent = true, desc = 'Page down to center'})
+vim.keymap.set('n', '<C-u>', '<C-u>zz', {noremap = false, silent = true, desc = 'Page up to center'})
+vim.keymap.set('n', 'n', 'nzzzv', {noremap = false, silent = true, desc = 'Next search to center'})
+vim.keymap.set('n', 'N', 'Nzzzv', {noremap = false, silent = true, desc = 'Previous search to center'})
 
 -- You can add more settings here, such as:
 vim.opt.number = true
