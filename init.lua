@@ -190,7 +190,7 @@ vim.api.nvim_create_autocmd("LspAttach", {
 -- Highlight yanked text for 150 milliseconds using the "IncSearch" highlight group
 vim.api.nvim_create_autocmd("TextYankPost", {
   callback = function()
-    vim.hl.on_yank({ higroup = "IncSearch", timeout = 150 })
+    vim.highlight.on_yank({ higroup = "IncSearch", timeout = 150 })
   end,
 })
 
